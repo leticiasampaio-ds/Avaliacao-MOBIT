@@ -51,7 +51,7 @@ class Contours:
         cv2.drawContours(image_rgb, contours, -1, color, thickness)
         return image_rgb
 
-    def run(self, min_area: int = 100) -> tuple:
+    def run(self) -> tuple:
         """
         Runs the full contour detection, filtering, and drawing pipeline.
 
@@ -64,6 +64,6 @@ class Contours:
                 - image_with_contours (np.ndarray): Image with contours drawn in color.
         """
         contours = self.find_external_contours()
-        filtered_contours = self.filter_contours_by_area(contours, min_area)
+        filtered_contours = self.filter_contours_by_area(contours)
         image_with_contours = self.draw_image_contours(filtered_contours)
         return filtered_contours, image_with_contours
