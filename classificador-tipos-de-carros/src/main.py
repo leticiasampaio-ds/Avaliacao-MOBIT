@@ -1,6 +1,7 @@
 from pathlib import Path
 from metadata.data_pipeline import DataPipeline
 from preprocessing.preprocessing_pipeline import PreprocessingPipeline
+from models.models_pipeline import ModelsPipeline
 
 class Main:
     """
@@ -21,11 +22,17 @@ class Main:
         output_dir_path = '/home/leticia/projetos/Avaliacao-MOBIT/classificador-tipos-de-carros/data/processed'
         PreprocessingPipeline(metadata_csv_path, output_dir_path).run()
 
+    def run_model_pipeline(self):
+        data_processed_path = '/home/leticia/projetos/Avaliacao-MOBIT/classificador-tipos-de-carros/data/processed'
+        ModelsPipeline(data_processed_path).run()
+
     def run(self):
         if self.preprocess_data_flag == True:
-            #self.preprocess_metadata()
+            self.preprocess_metadata()
             self.preprocess_images()
+        else:
+            self.run_model_pipeline()
 
 if __name__ == "__main__":
-    app = Main(True)
+    app = Main(False)
     app.run()
