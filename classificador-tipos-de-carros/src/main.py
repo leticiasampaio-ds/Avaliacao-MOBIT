@@ -1,5 +1,6 @@
 from pathlib import Path
-from data.data_pipeline import DataPipeline
+from metadata.data_pipeline import DataPipeline
+from preprocessing.preprocessing_pipeline import PreprocessingPipeline
 
 class Main:
     """
@@ -15,9 +16,15 @@ class Main:
         mat_path = Path('/home/leticia/projetos/Avaliacao-MOBIT/classificador-tipos-de-carros/data/raw/bmw10_annos.mat')
         DataPipeline(mat_path, '/home/leticia/projetos/Avaliacao-MOBIT/classificador-tipos-de-carros/data/raw/bmw10_ims').run()
 
+    def preprocess_images(self):
+        metadata_csv_path = '/home/leticia/projetos/Avaliacao-MOBIT/classificador-tipos-de-carros/data/processed/metadata.csv'
+        output_dir_path = '/home/leticia/projetos/Avaliacao-MOBIT/classificador-tipos-de-carros/data/processed'
+        PreprocessingPipeline(metadata_csv_path, output_dir_path).run()
+
     def run(self):
         if self.preprocess_data_flag == True:
-            self.preprocess_metadata()
+            #self.preprocess_metadata()
+            self.preprocess_images()
 
 if __name__ == "__main__":
     app = Main(True)

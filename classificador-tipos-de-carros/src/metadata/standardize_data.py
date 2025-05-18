@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-class StandardizeData:
+class StandardizeMetadata:
     """
     Standardizes metadata for image classification tasks.
 
@@ -33,7 +33,7 @@ class StandardizeData:
             lambda x: int(x[0][0]) if isinstance(x, (list, np.ndarray)) and isinstance(x[0], (list, np.ndarray)) else int(x)
         )
         self.df_metadata["label"] = self.df_metadata["class"].apply(
-            lambda x: x if x in [3, 4, 5] else "Others"
+            lambda x: x if x in [3, 4, 5] else "outros"
         )
 
 

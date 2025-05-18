@@ -1,5 +1,5 @@
-from data.load_metadata import LoadMetadata
-from data.standardize_data import StandardizeData
+from metadata.load_metadata import LoadMetadata
+from metadata.standardize_data import StandardizeMetadata
 
 from pathlib import Path
 
@@ -30,4 +30,4 @@ class DataPipeline:
         Returns:
             pd.DataFrame: Standardized metadata ready for dataset splitting and model training.
         """
-        return StandardizeData(self.df_metadata, self.images_root).run()
+        return StandardizeMetadata(self.df_metadata, self.images_root).run()
