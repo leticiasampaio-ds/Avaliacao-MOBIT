@@ -51,15 +51,6 @@ class LoadMetadata:
         df_metadata = pd.DataFrame(metadata_list, columns=["fname", "class", "bbox_x1", "bbox_x2", "bbox_y1", "bbox_y2", "height", "width"])
         return df_metadata
     
-    def save_dataframe_to_csv(self, df_metadata: pd.DataFrame):
-        """
-        Saves dataframe with metadata to 'data/processed' directory.
-
-        Args:
-            metadata (pd.DataFrame): DataFrame with BMW-10 dataset.
-        """
-        df_metadata.to_csv('/home/leticia/projetos/Avaliacao-MOBIT/classificador-tipos-de-carros/data/processed/metadata.csv', index=False)
-    
     def run(self):
         """
         Runs the complete metadata extraction, conversion, save pipeline.
@@ -69,4 +60,4 @@ class LoadMetadata:
         """
         metadata = self.extract_metadata()
         df_metadata = self.convert_list_to_dataframe(metadata)
-        self.save_dataframe_to_csv(df_metadata)
+        return df_metadata
