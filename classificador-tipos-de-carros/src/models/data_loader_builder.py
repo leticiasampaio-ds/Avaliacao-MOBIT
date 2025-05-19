@@ -1,23 +1,22 @@
 import os
 from pathlib import Path
-from torch.utils.data import DataLoader
+from collections import Counter
+from torch.utils.data import DataLoader, WeightedRandomSampler
 from torchvision import datasets, transforms
 
 class DataLoaderBuilder:
     """
-    Builds PyTorch DataLoaders for preprocessed image datasets.
+    Builds PyTorch DataLoaders for image classification tasks, supporting class balancing via WeightedRandomSampler.
 
     Args:
-        data_root (Path): Root directory where preprocessed images are stored in class subfolders.
+        data_root (Path): Root directory where preprocessed images are stored in subfolders per class.
         batch_size (int): Number of samples per batch.
-        num_workers (int): Number of subprocesses used for data loading.
-        shuffle (bool): Whether to shuffle the training data.
+        num_workers (int): Number of subprocesses for data loading.
     """
-    def __init__(self, data_root: Path, batch_size: int = 16, num_workers: int = 0, shuffle: bool = True):
+    def __init__(self, data_root: Path, batch_size: int = 16, num_workers: int = 0):
         self.data_root = Path(data_root)
         self.batch_size = batch_size
         self.num_workers = num_workers
-        self.shuffle = shuffle
 
         self.transform = transforms.Compose([
             transforms.ToTensor(),
@@ -25,22 +24,37 @@ class DataLoaderBuilder:
                                  std=[0.229, 0.224, 0.225])
         ])
 
-    def build_loader(self, subset: str):
+    def build_loader(self, subset: str) -> DataLoader:
         """
-        Builds a DataLoader for a specific subset ('train', 'val', or 'test').
+        Builds a DataLoader for a specified subset ('train', 'val', 'test').
 
         Args:
-            subset (str): Which subset to load ('train', 'val', 'test').
+            subset (str): Dataset split to load.
 
         Returns:
-            DataLoader: PyTorch DataLoader for the specified subset.
+            DataLoader: Configured PyTorch DataLoader.
         """
-        subset_path = os.path.join(self.data_root, subset)
+        subset_path = self.data_root / subset
         dataset = datasets.ImageFolder(root=subset_path, transform=self.transform)
 
-        return DataLoader(
-            dataset,
-            batch_size=self.batch_size,
-            shuffle=self.shuffle if subset == 'train' else False,
-            num_workers=self.num_workers
-        )
+        if subset == "train":
+            # Compute class weights for oversampling
+            class_counts = Counter([label for _, label in dataset.imgs])
+            total = sum(class_counts.values())
+            class_weights = {cls: total / count for cls, count in class_counts.items()}
+            sample_weights = [class_weights[label] for _, label in dataset.imgs]
+            sampler = WeightedRandomSampler(sample_weights, num_samples=len(sample_weights), replacement=True)
+
+            return DataLoader(
+                dataset,
+                batch_size=self.batch_size,
+                sampler=sampler,
+                num_workers=self.num_workers
+            )
+        else:
+            return DataLoader(
+                dataset,
+                batch_size=self.batch_size,
+                shuffle=False,
+                num_workers=self.num_workers
+            )

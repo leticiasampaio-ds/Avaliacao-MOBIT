@@ -1,10 +1,11 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from sklearn.metrics import classification_report, confusion_matrix,accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, precision_score, recall_score, f1_score
 import seaborn as sns
 import matplotlib.pyplot as plt
 import torchvision.models as models
+from collections import Counter
 
 class ModelTrainer:
     """
@@ -20,6 +21,7 @@ class ModelTrainer:
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.test_loader = test_loader
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = None
 
     def build_model(self, learning_rate=1e-4):
@@ -30,10 +32,23 @@ class ModelTrainer:
             learning_rate (float): Learning rate for the optimizer.
         """
         model = models.resnet18(pretrained=True)
-        model.fc = nn.Linear(model.fc.in_features, 4)
-        self.model = model.to(torch.device("cpu"))
-        self.criterion = nn.CrossEntropyLoss()
-        self.optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
+        model.fc = nn.Sequential(
+            nn.Dropout(p=0.3),
+            nn.Linear(model.fc.in_features, 4)
+        )
+        self.model = model.to(self.device)
+
+        # Compute class weights
+        targets = []
+        for _, labels in self.train_loader:
+            targets.extend(labels.numpy())
+        class_counts = Counter(targets)
+        total = sum(class_counts.values())
+        weights = [total / class_counts[i] if class_counts[i] > 0 else 0.0 for i in range(4)]
+        class_weights = torch.tensor(weights, dtype=torch.float32).to(self.device)
+
+        self.criterion = nn.CrossEntropyLoss(weight=class_weights)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=learning_rate, weight_decay=1e-4)
 
     def train(self, num_epochs=10):
         """
@@ -42,24 +57,17 @@ class ModelTrainer:
         Args:
             num_epochs (int): Number of training epochs.
         """
-        if self.model is None:
-            raise ValueError("Model has not been built. Call `build_model()` first.")
-
+        self.model.train()
         for epoch in range(num_epochs):
-            self.model.train()
             total_loss = 0
-
             for images, labels in self.train_loader:
-                images, labels = images.to(torch.device("cpu")), labels.to(torch.device("cpu"))
-
+                images, labels = images.to(self.device), labels.to(self.device)
                 outputs = self.model(images)
                 loss = self.criterion(outputs, labels)
-
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
                 total_loss += loss.item()
-
             val_acc = self.validate()
             print(f"Epoch [{epoch + 1}/{num_epochs}] - Loss: {total_loss:.4f} - Val Acc: {val_acc:.4f}")
 
@@ -73,15 +81,13 @@ class ModelTrainer:
         self.model.eval()
         correct = 0
         total = 0
-
         with torch.no_grad():
             for images, labels in self.val_loader:
-                images, labels = images.to(torch.device("cpu")), labels.to(torch.device("cpu"))
+                images, labels = images.to(self.device), labels.to(self.device)
                 outputs = self.model(images)
                 _, predicted = torch.max(outputs, 1)
                 correct += (predicted == labels).sum().item()
                 total += labels.size(0)
-
         return correct / total
 
     def evaluate(self):
@@ -89,7 +95,7 @@ class ModelTrainer:
         Evaluates the model on the test set and computes metrics.
 
         Returns:
-            Tuple: (accuracy, precision, recall, f1_score, y_true, y_pred)
+            Tuple[List[int], List[int]]: True and predicted labels.
         """
         self.model.eval()
         y_true = []
@@ -97,31 +103,24 @@ class ModelTrainer:
 
         with torch.no_grad():
             for images, labels in self.test_loader:
-                images = images.to(torch.device("cpu"))
-                labels = labels.to(torch.device("cpu"))
+                images, labels = images.to(self.device), labels.to(self.device)
                 outputs = self.model(images)
                 _, predicted = torch.max(outputs, 1)
                 y_true.extend(labels.cpu().numpy())
                 y_pred.extend(predicted.cpu().numpy())
 
-        # Compute metrics
-        accuracy = accuracy_score(y_true, y_pred)
-        precision = precision_score(y_true, y_pred, average='weighted', zero_division=0)
-        recall = recall_score(y_true, y_pred, average='weighted', zero_division=0)
+        acc = accuracy_score(y_true, y_pred)
+        prec = precision_score(y_true, y_pred, average='weighted', zero_division=0)
+        rec = recall_score(y_true, y_pred, average='weighted', zero_division=0)
         f1 = f1_score(y_true, y_pred, average='weighted', zero_division=0)
 
-        print(f"Accuracy:  {accuracy:.4f}")
-        print(f"Precision: {precision:.4f}")
-        print(f"Recall:    {recall:.4f}")
-        print(f"F1 Score:  {f1:.4f}")
-
-        return accuracy, precision, recall, f1, y_true, y_pred
-
+        print(f"Accuracy: {acc:.4f}, Precision: {prec:.4f}, Recall: {rec:.4f}, F1-score: {f1:.4f}")
+        return y_true, y_pred
 
     def show_metrics(self, y_true, y_pred, class_names=None, save_path=None):
         """
         Displays classification report and confusion matrix.
-        
+
         Args:
             y_true (List[int]): True labels.
             y_pred (List[int]): Predicted labels.
@@ -139,13 +138,15 @@ class ModelTrainer:
         plt.title("Confusion Matrix")
         plt.tight_layout()
 
-        plt.savefig(save_path)
-        print(f"Confusion matrix saved to {save_path}")
+        if save_path:
+            plt.savefig(save_path)
+            print(f"Confusion matrix saved to {save_path}")
+        plt.show()
 
     def run(self, num_epochs=10):
         """
         Runs the full pipeline: build, train, validate, evaluate and show metrics.
-        
+
         Args:
             num_epochs (int): Number of epochs for training.
         """
